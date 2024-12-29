@@ -5,6 +5,8 @@ def rfile(name_file):
  with open(name_file, "r", encoding="utf-8") as file:
     content_sys = file.read()
     return content_sys
+ 
+ #m
 
 # Hiển thị logo ở trên cùng, căn giữa
 col1, col2, col3 = st.columns([3, 2, 3])
