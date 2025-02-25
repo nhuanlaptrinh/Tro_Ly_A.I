@@ -1,87 +1,122 @@
 import streamlit as st
 from openai import OpenAI
+import json
+import os
 
+# Hàm đọc nội dung từ file văn bản
 def rfile(name_file):
- with open(name_file, "r", encoding="utf-8") as file:
-    content_sys = file.read()
-    return content_sys
- 
-# Hiển thị logo ở trên cùng, căn giữa
-col1, col2, col3 = st.columns([3, 2, 3])
-with col2:
-    st.image("logo.png", use_container_width=True)  # Thay use_column_width bằng use_container_width
+    with open(name_file, "r", encoding="utf-8") as file:
+        return file.read()
 
-# Tùy chỉnh nội dung tiêu đề
+# Hàm lưu lịch sử trò chuyện vào file JSON
+def save_chat_history():
+    with open("chat_history.json", "w", encoding="utf-8") as f:
+        json.dump(st.session_state.messages, f, ensure_ascii=False, indent=4)
+
+# Hàm tải lịch sử trò chuyện từ file JSON
+def load_chat_history():
+    if os.path.exists("chat_history.json"):
+        with open("chat_history.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+# Hàm xóa lịch sử trò chuyện
+def clear_chat_history():
+    if os.path.exists("chat_history.json"):
+        os.remove("chat_history.json")  # Xóa file lịch sử
+    st.session_state.messages = [INITIAL_SYSTEM_MESSAGE, INITIAL_ASSISTANT_MESSAGE]  # Reset session
+    st.rerun()  # Làm mới giao diện ngay lập tức
+
+# Hiển thị logo (nếu có)
+try:
+    col1, col2, col3 = st.columns([3, 2, 3])
+    with col2:
+        st.image("logo.png", use_container_width=True)
+except:
+    pass
+
+# Hiển thị tiêu đề
 title_content = rfile("00.xinchao.txt")
-
-# Hiển thị tiêu đề với nội dung tùy chỉnh
 st.markdown(
-    f"""
-    <h1 style="text-align: center; font-size: 24px;">{title_content}</h1>
+    f"""<h1 style="text-align: center; font-size: 24px;">{title_content}</h1>""",
+    unsafe_allow_html=True
+)
+
+# Lấy OpenAI API key từ `st.secrets`
+openai_api_key = st.secrets.get("OPENAI_API_KEY")
+
+# Khởi tạo OpenAI client
+client = OpenAI(api_key=openai_api_key)
+
+# Khởi tạo tin nhắn "system" và "assistant"
+INITIAL_SYSTEM_MESSAGE = {"role": "system", "content": rfile("01.system_trainning.txt")}
+INITIAL_ASSISTANT_MESSAGE = {"role": "assistant", "content": rfile("02.assistant.txt")}
+
+# Kiểm tra nếu chưa có session lưu trữ thì tải từ file JSON
+if "messages" not in st.session_state:
+    st.session_state.messages = load_chat_history()
+    if not st.session_state.messages:
+        st.session_state.messages = [INITIAL_SYSTEM_MESSAGE, INITIAL_ASSISTANT_MESSAGE]
+
+# **Nút XÓA LỊCH SỬ**
+if st.button("🗑️ Xóa lịch sử", use_container_width=True):
+    clear_chat_history()
+
+# CSS để căn chỉnh trợ lý bên trái, người hỏi bên phải, và thêm icon trợ lý
+st.markdown(
+    """
+    <style>
+        .assistant {
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 75%;
+            background: none; /* Màu trong suốt */
+            text-align: left;
+        }
+        .user {
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 75%;
+            background-color: #f0f2f5; /* Màu xanh nhạt cho tin nhắn người hỏi */
+            text-align: right;
+            margin-left: auto;
+        }
+        .assistant::before { content: "🤖 "; font-weight: bold; }
+    </style>
     """,
     unsafe_allow_html=True
 )
 
-# Lấy OpenAI API key từ `st.secrets`.
-openai_api_key = st.secrets.get("OPENAI_API_KEY")
 
-#1
-
-# Tạo OpenAI client.
-client = OpenAI(api_key=openai_api_key)
-
-# Khởi tạo lời nhắn "system" để định hình hành vi mô hình.
-INITIAL_SYSTEM_MESSAGE = {
-    "role": "system",
-    "content":rfile("01.system_trainning.txt") ,
-}
-
-# Khởi tạo lời nhắn ví dụ từ vai trò "assistant".
-INITIAL_ASSISTANT_MESSAGE = {
-    "role": "assistant",
-    "content":rfile("02.assistant.txt"),
-}
-
-# # Khởi tạo lời nhắn ví dụ từ vai trò "user".
-# INITIAL_USER_MESSAGE = {
-#     "role": "user",
-#     "content": (
-#         "Xin chào trợ lý Anh Lập Trình ! Tôi muốn tìm hiểu thêm về cách sử dụng dịch vụ của bạn. "
-#         "Bạn có thể giúp tôi được không?"
-#     ),
-# }
-
-# Tạo một biến trạng thái session để lưu trữ các tin nhắn nếu chưa tồn tại.
-if "messages" not in st.session_state:
-    st.session_state.messages = [INITIAL_SYSTEM_MESSAGE, INITIAL_ASSISTANT_MESSAGE]
-
-# Loại bỏ INITIAL_SYSTEM_MESSAGE khỏi giao diện hiển thị.
+# Hiển thị lịch sử tin nhắn (loại bỏ system để tránh hiển thị)
 for message in st.session_state.messages:
-    if message["role"] != "system":
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    if message["role"] == "assistant":
+        st.markdown(f'<div class="assistant">{message["content"]}</div>', unsafe_allow_html=True)
+    elif message["role"] == "user":
+        st.markdown(f'<div class="user">{message["content"]}</div>', unsafe_allow_html=True)
 
-# Tạo ô nhập liệu cho người dùng.
+# Ô nhập liệu cho người dùng
 if prompt := st.chat_input("Bạn nhập nội dung cần trao đổi ở đây nhé?"):
-
-    # Lưu trữ và hiển thị tin nhắn của người dùng.
+    # Lưu tin nhắn người dùng vào session
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    st.markdown(f'<div class="user">{prompt}</div>', unsafe_allow_html=True)
 
-    # Tạo phản hồi từ API OpenAI.
+    # Tạo phản hồi từ API OpenAI
+    response = ""
     stream = client.chat.completions.create(
-        model = rfile("module_chatgpt.txt"),
-        messages=[
-            {"role": m["role"], "content": m["content"]}
-            for m in st.session_state.messages
-        ],
+        model=rfile("module_chatgpt.txt").strip(),
+        messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
         stream=True,
     )
 
-    # Hiển thị và lưu phản hồi của trợ lý.
-    with st.chat_message("assistant"):
-        response = st.write_stream(stream)
+    # Ghi lại phản hồi của trợ lý vào biến
+    for chunk in stream:
+        if chunk.choices:
+            response += chunk.choices[0].delta.content or ""
+
+    # Hiển thị phản hồi của trợ lý và lưu lại
+    st.markdown(f'<div class="assistant">{response}</div>', unsafe_allow_html=True)
     st.session_state.messages.append({"role": "assistant", "content": response})
 
-    #xin chào tôi chỉ đang test
+    # Lưu lịch sử trò chuyện vào file sau mỗi lần có tin nhắn mới
+    save_chat_history()
