@@ -1,31 +1,11 @@
 import streamlit as st
 from openai import OpenAI
-import json
 import os
 
 # Hàm đọc nội dung từ file văn bản
 def rfile(name_file):
     with open(name_file, "r", encoding="utf-8") as file:
         return file.read()
-
-# Hàm lưu lịch sử trò chuyện vào file JSON
-def save_chat_history():
-    with open("chat_history.json", "w", encoding="utf-8") as f:
-        json.dump(st.session_state.messages, f, ensure_ascii=False, indent=4)
-
-# Hàm tải lịch sử trò chuyện từ file JSON
-def load_chat_history():
-    if os.path.exists("chat_history.json"):
-        with open("chat_history.json", "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-# Hàm xóa lịch sử trò chuyện
-def clear_chat_history():
-    if os.path.exists("chat_history.json"):
-        os.remove("chat_history.json")  # Xóa file lịch sử
-    st.session_state.messages = [INITIAL_SYSTEM_MESSAGE, INITIAL_ASSISTANT_MESSAGE]  # Reset session
-    st.rerun()  # Làm mới giao diện ngay lập tức
 
 # Hiển thị logo (nếu có)
 try:
@@ -42,7 +22,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Lấy OpenAI API key từ `st.secrets`
+# Lấy OpenAI API key từ st.secrets
 openai_api_key = st.secrets.get("OPENAI_API_KEY")
 
 # Khởi tạo OpenAI client
@@ -52,15 +32,9 @@ client = OpenAI(api_key=openai_api_key)
 INITIAL_SYSTEM_MESSAGE = {"role": "system", "content": rfile("01.system_trainning.txt")}
 INITIAL_ASSISTANT_MESSAGE = {"role": "assistant", "content": rfile("02.assistant.txt")}
 
-# Kiểm tra nếu chưa có session lưu trữ thì tải từ file JSON
+# Kiểm tra nếu chưa có session lưu trữ thì khởi tạo tin nhắn ban đầu
 if "messages" not in st.session_state:
-    st.session_state.messages = load_chat_history()
-    if not st.session_state.messages:
-        st.session_state.messages = [INITIAL_SYSTEM_MESSAGE, INITIAL_ASSISTANT_MESSAGE]
-
-# **Nút XÓA LỊCH SỬ**
-if st.button("🗑️ Xóa lịch sử", use_container_width=True):
-    clear_chat_history()
+    st.session_state.messages = [INITIAL_SYSTEM_MESSAGE, INITIAL_ASSISTANT_MESSAGE]
 
 # CSS để căn chỉnh trợ lý bên trái, người hỏi bên phải, và thêm icon trợ lý
 st.markdown(
@@ -86,7 +60,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 
 # Hiển thị lịch sử tin nhắn (loại bỏ system để tránh hiển thị)
 for message in st.session_state.messages:
@@ -114,9 +87,8 @@ if prompt := st.chat_input("Bạn nhập nội dung cần trao đổi ở đây 
         if chunk.choices:
             response += chunk.choices[0].delta.content or ""
 
-    # Hiển thị phản hồi của trợ lý và lưu lại
+    # Hiển thị phản hồi của trợ lý
     st.markdown(f'<div class="assistant">{response}</div>', unsafe_allow_html=True)
-    st.session_state.messages.append({"role": "assistant", "content": response})
 
-    # Lưu lịch sử trò chuyện vào file sau mỗi lần có tin nhắn mới
-    save_chat_history()
+    # Cập nhật lịch sử tin nhắn trong session
+    st.session_state.messages.append({"role": "assistant", "content": response})
